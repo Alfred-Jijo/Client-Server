@@ -2,9 +2,15 @@
 #include <string>
 #include <vector>
 #include <thread>
+#include <mutex>
+#include <atomic>
 #include <winsock2.h>
 
 #pragma comment(lib, "ws2_32.lib")
+
+std::mutex clientsMutex;
+std::vector<SOCKET> clients;
+std::atomic_bool isRunning(true);
 
 void handleClient(SOCKET clientSocket)
 {
@@ -18,7 +24,16 @@ void handleClient(SOCKET clientSocket)
             std::string message(buffer, bytesReceived);
             std::cout << "Received message: " << message << std::endl;
         }
+        else
+        {
+            // Client disconnected
+            break;
+        }
     } while (bytesReceived > 0);
+
+    // Remove disconnected client from the list
+    std::lock_guard<std::mutex> lock(clientsMutex);
+    clients.erase(std::remove(clients.begin(), clients.end(), clientSocket), clients.end());
 
     closesocket(clientSocket);
 }
@@ -70,7 +85,7 @@ int main()
 
     std::vector<std::thread> clientThreads;
 
-    while (true)
+    while (isRunning)
     {
         SOCKET clientSocket = accept(serverSocket, NULL, NULL);
         if (clientSocket == INVALID_SOCKET)
@@ -79,8 +94,17 @@ int main()
             continue;
         }
 
-        std::thread clientThread(handleClient, clientSocket);
-        clientThreads.push_back(std::move(clientThread));
+        std::lock_guard<std::mutex> lock(clientsMutex);
+        clients.push_back(clientSocket);
+
+        clientThreads.emplace_back(handleClient, clientSocket);
+    }
+
+    // Gracefully shut down existing connections
+    std::lock_guard<std::mutex> lock(clientsMutex);
+    for (SOCKET client : clients)
+    {
+        closesocket(client);
     }
 
     for (auto &thread : clientThreads)
