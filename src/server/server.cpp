@@ -1,43 +1,8 @@
 #include <iostream>
 #include <string>
-#include <vector>
-#include <thread>
-#include <mutex>
-#include <atomic>
-#include <algorithm>
 #include <winsock2.h>
 
 #pragma comment(lib, "ws2_32.lib")
-
-std::mutex clientsMutex;
-std::vector<SOCKET> clients;
-std::atomic_bool isRunning(true);
-
-void handleClient(SOCKET clientSocket)
-{
-    char buffer[1024];
-    int bytesReceived;
-    do
-    {
-        bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
-        if (bytesReceived > 0)
-        {
-            std::string message(buffer, bytesReceived);
-            std::cout << "Received message: " << message << std::endl;
-        }
-        else
-        {
-            // Client disconnected
-            break;
-        }
-    } while (bytesReceived > 0);
-
-    // Remove disconnected client from the list
-    std::lock_guard<std::mutex> lock(clientsMutex);
-    clients.erase(std::remove(clients.begin(), clients.end(), clientSocket), clients.end());
-
-    closesocket(clientSocket);
-}
 
 int main()
 {
@@ -84,35 +49,28 @@ int main()
 
     std::cout << "Server is listening on port " << port << std::endl;
 
-    std::vector<std::thread> clientThreads;
-
-    while (isRunning)
+    SOCKET clientSocket = accept(serverSocket, NULL, NULL);
+    if (clientSocket == INVALID_SOCKET)
     {
-        SOCKET clientSocket = accept(serverSocket, NULL, NULL);
-        if (clientSocket == INVALID_SOCKET)
+        std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
+        closesocket(serverSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    char buffer[1024];
+    int bytesReceived;
+    do
+    {
+        bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+        if (bytesReceived > 0)
         {
-            std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
-            continue;
+            std::string message(buffer, bytesReceived);
+            std::cout << "Received message: " << message << std::endl;
         }
+    } while (bytesReceived > 0);
 
-        std::lock_guard<std::mutex> lock(clientsMutex);
-        clients.push_back(clientSocket);
-
-        clientThreads.emplace_back(handleClient, clientSocket);
-    }
-
-    // Gracefully shut down existing connections
-    std::lock_guard<std::mutex> lock(clientsMutex);
-    for (SOCKET client : clients)
-    {
-        closesocket(client);
-    }
-
-    for (auto &thread : clientThreads)
-    {
-        thread.join();
-    }
-
+    closesocket(clientSocket);
     closesocket(serverSocket);
     WSACleanup();
 
