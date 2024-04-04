@@ -1,8 +1,27 @@
 #include <iostream>
 #include <string>
+#include <vector>
+#include <thread>
 #include <winsock2.h>
 
 #pragma comment(lib, "ws2_32.lib")
+
+void handleClient(SOCKET clientSocket)
+{
+    char buffer[1024];
+    int bytesReceived;
+    do
+    {
+        bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+        if (bytesReceived > 0)
+        {
+            std::string message(buffer, bytesReceived);
+            std::cout << "Received message: " << message << std::endl;
+        }
+    } while (bytesReceived > 0);
+
+    closesocket(clientSocket);
+}
 
 int main()
 {
@@ -49,28 +68,26 @@ int main()
 
     std::cout << "Server is listening on port " << port << std::endl;
 
-    SOCKET clientSocket = accept(serverSocket, NULL, NULL);
-    if (clientSocket == INVALID_SOCKET)
+    std::vector<std::thread> clientThreads;
+
+    while (true)
     {
-        std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
-        closesocket(serverSocket);
-        WSACleanup();
-        return 1;
+        SOCKET clientSocket = accept(serverSocket, NULL, NULL);
+        if (clientSocket == INVALID_SOCKET)
+        {
+            std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
+            continue;
+        }
+
+        std::thread clientThread(handleClient, clientSocket);
+        clientThreads.push_back(std::move(clientThread));
     }
 
-    char buffer[1024];
-    int bytesReceived;
-    do
+    for (auto &thread : clientThreads)
     {
-        bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
-        if (bytesReceived > 0)
-        {
-            std::string message(buffer, bytesReceived);
-            std::cout << "Received message: " << message << std::endl;
-        }
-    } while (bytesReceived > 0);
+        thread.join();
+    }
 
-    closesocket(clientSocket);
     closesocket(serverSocket);
     WSACleanup();
 
