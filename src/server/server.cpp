@@ -22,5 +22,57 @@ int main()
         return 1;
     }
 
-        return 0;
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    std::cout << "Enter the port to listen on: ";
+    unsigned short port;
+    std::cin >> port;
+    serverAddr.sin_port = htons(port);
+
+    if (bind(serverSocket, (sockaddr *)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR)
+    {
+        std::cerr << "Bind failed: " << WSAGetLastError() << std::endl;
+        closesocket(serverSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR)
+    {
+        std::cerr << "Listen failed: " << WSAGetLastError() << std::endl;
+        closesocket(serverSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    std::cout << "Server is listening on port " << port << std::endl;
+
+    SOCKET clientSocket = accept(serverSocket, NULL, NULL);
+    if (clientSocket == INVALID_SOCKET)
+    {
+        std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
+        closesocket(serverSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    char buffer[1024];
+    int bytesReceived;
+    do
+    {
+        bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
+        if (bytesReceived > 0)
+        {
+            std::string message(buffer, bytesReceived);
+            std::cout << "Received message: " << message << std::endl;
+        }
+    } while (bytesReceived > 0);
+
+    closesocket(clientSocket);
+    closesocket(serverSocket);
+    WSACleanup();
+
+    return 0;
 }
