@@ -14,10 +14,6 @@ void executeCommand(const std::string &command)
         std::string commandString = command.substr(startPos + 2, endPos - startPos - 2);
         system(commandString.c_str());
     }
-    else
-    {
-        std::cerr << "Invalid command format: " << command << std::endl;
-    }
 }
 
 int main()
