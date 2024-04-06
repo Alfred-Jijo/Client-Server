@@ -15,7 +15,7 @@ int main() {
   SOCKET clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (clientSocket == INVALID_SOCKET) {
     std::cerr << "Error creating client socket: " << WSAGetLastError()
-              << std::endl;
+              << "EOERR" << std::endl;
     WSACleanup();
     return 1;
   }
